@@ -1,6 +1,6 @@
 ---
 title: "Life Expectancy"
-subtitle: "PArt 1: Project Proposal"
+subtitle: "Part 1: Project Proposal"
 author: Sean O'Sullivan
 date: "`r Sys.Date()`"
 format:
