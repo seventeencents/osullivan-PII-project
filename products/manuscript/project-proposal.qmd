@@ -1,5 +1,5 @@
 ---
-title: "Life Expectancy"
+title: "Phishing for Spam"
 subtitle: "Part 1: Project Proposal"
 author: Sean O'Sullivan
 date: "`r Sys.Date()`"
