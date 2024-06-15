@@ -5,116 +5,93 @@
 #and saves it as Rds file in the processed-data folder
 #
 # Note the ## ---- name ---- notation
-# This is done so one can pull in the chunks of code into the Quarto document
+# This is done so one can pull in the chunks of code into Quarto documents
 # see here: https://bookdown.org/yihui/rmarkdown-cookbook/read-chunk.html
 ###############################
 
 
 ## ---- packages --------
-#load needed packages. make sure they are installed.
-library(readxl) #for loading Excel files
-library(dplyr) #for data processing/cleaning
-library(tidyr) #for data processing/cleaning
-library(skimr) #for nice visualization of data 
-library(here) #to set paths
+# load needed packages. make sure they are installed.
+library(dplyr) # for data processing/cleaning
+library(tidyverse) # for data processing/cleaning
+library(skimr) # for nice visualization of data 
+library(here) # to set paths
+library(lubridate) # to convert datetimes
+library(stringr) # to perform regex extractions
 
 
 ## ---- loaddata --------
-#path to data
-#note the use of the here() package and not absolute paths
-data_location <- here::here("data","raw-data","exampledata.xlsx")
-#load data. 
-#note that for functions that come from specific packages (instead of base R)
-# I often specify both package and function like so
-#package::function() that's not required one could just call the function
-#specifying the package makes it clearer where the function "lives",
-#but it adds typing. You can do it either way.
-rawdata <- readxl::read_excel(data_location)
-# We might also want to load the codebook to look at it
-codebook <- readxl::read_excel(data_location, sheet ="Codebook")
-
+# path to data
+# note the use of the here() package and not absolute paths
+file1_location <- here::here("data","raw-data","CEAS_08.csv")
+file2_location <- here::here("data","raw-data","Nigerian_Fraud.csv")
+file3_location <- here::here("data","raw-data","SpamAssasin.csv")
+# load data.
+file1 <- read.csv(file1_location)
+file2 <- read.csv(file2_location)
+file3 <- read.csv(file3_location)
+# append dataframes
+rawdata <- bind_rows(list(file1, file2, file3))
 
 ## ---- exploredata --------
 #take a look at the data
 dplyr::glimpse(rawdata)
 #another way to look at the data
 summary(rawdata)
-#yet another way to get an idea of the data
-head(rawdata)
 #this is a nice way to look at data
 skimr::skim(rawdata)
-#look in the Codebook for a variable explanation
-print(codebook)
 
 
-## ---- cleandata1 --------
-# Inspecting the data, we find some problems that need addressing:
-# First, there is an entry for height which says "sixty" instead of a number. 
-# Does that mean it should be a numeric 60? It somehow doesn't make
-# sense since the weight is 60kg, which can't happen for a 60cm person (a baby)
-# Since we don't know how to fix this, we might decide to remove the person.
-# This "sixty" entry also turned all Height entries into characters instead of numeric.
-# That conversion to character also means that our summary function isn't very meaningful.
-# So let's fix that first.
-d1 <- rawdata %>% dplyr::filter( Height != "sixty" ) %>% 
-                  dplyr::mutate(Height = as.numeric(Height))
-# look at partially fixed data again
-skimr::skim(d1)
-hist(d1$Height)
-
-
-## ---- cleandata2 --------
-# Now we see that there is one person with a height of 6. 
-# that could be a typo, or someone mistakenly entered their height in feet.
-# If we don't know, we might need to remove this person.
-# But let's assume that we somehow know that this is meant to be 6 feet, so we can convert to centimeters.
-d2 <- d1 %>% dplyr::mutate( Height = replace(Height, Height=="6",round(6*30.48,0)) )
-#height values seem ok now
-skimr::skim(d2)
-
-
-## ---- cleandata3 --------
-# now let's look at weight
-# there is a person with weight of 7000, which is impossible,
-# and one person with missing weight.
-# Note that the original data had an empty cell. 
-# The codebook says that's not allowed, it should have been NA.
-# R automatically converts empty values to NA.
-# If you don't want that, you can adjust it when you load the data.
-# to be able to analyze the data, we'll remove those individuals as well.
-# Note: Some analysis methods can deal with missing values, so it's not always necessary to remove them. 
-# This should be adjusted based on your planned analysis approach. 
-d3 <- d2 %>%  dplyr::filter(Weight != 7000) %>% tidyr::drop_na()
-skimr::skim(d3)
-
-
-## ---- cleandata4 --------
-# We also want to have Gender coded as a categorical/factor variable
-# we can do that with simple base R code to mix things up
-d3$Gender <- as.factor(d3$Gender)  
-skimr::skim(d3)
-
-
-## ---- cleandata5 --------
-#now we see that there is another NA, but it's not "NA" from R 
-#instead it was loaded as character and is now considered as a category.
-#There is also an individual coded as "N" which is not allowed.
-#This could be mistyped M or a mistyped NA. If we have a good guess, we could adjust.
-#If we don't we might need to remove that individual.
-#well proceed here by removing both the NA and N individuals
-#since this keeps an empty category, I'm also using droplevels() to get rid of it
-d4 <- d3 %>% dplyr::filter( !(Gender %in% c("NA","N")) ) %>% droplevels()
-skimr::skim(d4)
-
+## ---- cleandata --------
+# create a distinct copy for processing
+processeddata <- data.table::copy(rawdata)
+# convert label and urls to factor
+processeddata$label <- as.factor(processeddata$label)
+processeddata$urls <- as.factor(processeddata$urls)
+# create character length of subject and body fields and clean sender/receiver emails
+# some sender and receiver emails either lack an email address or lack any attached contact name to be removed
+# we utilize the dplyr 'if_else' function to handle separate cases and ensure we're returning consistent
+# results throughout all rows of the dataset
+processeddata <- processeddata %>% 
+                 mutate(bodylength = nchar(trimws(body)),
+                        subjectlength = nchar(trimws(subject)),
+                        sender = if_else(
+                                         is.na(str_match(processeddata$sender,"<([^>]*)>")[,2]),
+                                         processeddata$sender,
+                                         str_match(processeddata$sender,"<([^>]*)>")[,2]
+                                         ),
+                        receiver = if_else(
+                                           is.na(str_match(processeddata$receiver,"<([^>]*)>")[,2]),
+                                           processeddata$receiver,
+                                           str_match(processeddata$receiver,"<([^>]*)>")[,2]
+                                           ),
+                        )
+# create boolean check for sender == receiver as well as extract sender/receiver domains
+# some sender and receiver emails either lack an email address or lack any attached contact name to be removed
+# we utilize the dplyr 'if_else' function to handle separate cases and ensure we're returning consistent
+# results throughout all rows of the dataset
+processeddata <- processeddata %>% mutate(
+                                          recursive = processeddata$sender == processeddata$receiver,
+                                          senderdomain = if_else(
+                                                                is.na(str_extract(processeddata$sender, "(?<=@).*")),
+                                                                "",
+                                                                str_extract(processeddata$sender, "(?<=@).*")
+                                                                ),
+                                          receiverdomain = if_else(
+                                                                  is.na(str_extract(processeddata$receiver, "(?<=@).*")),
+                                                                  "",
+                                                                  str_extract(processeddata$receiver, "(?<=@).*")
+                                                                  ),
+                                          )
+skimr::skim(processeddata)
 
 ## ---- savedata --------
-# all done, data is clean now. 
-# Let's assign at the end to some final variable
-# makes it easier to add steps above
-processeddata <- d4
-# location to save file
-save_data_location <- here::here("data","processed-data","processeddata.rds")
-saveRDS(processeddata, file = save_data_location)
+# location to save raw file
+save_raw_data_location <- here::here("data","raw-data","rawdata.rds")
+saveRDS(rawdata, file = save_raw_data_location)
+# location to save processed file
+save_processed_data_location <- here::here("data","processed-data","processeddata.rds")
+saveRDS(processeddata, file = save_processed_data_location)
 
 
 
