@@ -54,7 +54,7 @@ Our first step in cleaning the data centers around data type conversions, namely
 
 In addition to cleaning some of the existing features we also sought to generate a few simple features that we believe may be of use in our analysis and modeling stages further down the line. Specifically, we created features that measure the character length of both the subject line and email bodies as well as a boolean features that assesses whether or not the sender and receiver email were the same.
 
-By the end of our data loading and processing we arrived at a dataset that contains 7 character columns, 2 numeric columns, 2 factor columns, and a single boolean column -- taking care to ensure that our steps prevented generating any missing values where there hadn't previously been any. Ultimately this makes for a dataset with 48,295 rows across 11 features and our variable of interest. Complete steps and code can be located in the `.../code/processingprocessingcode.R` file found within the project.
+By the end of our data loading and processing we arrived at a dataset that contains 7 character columns, 2 numeric columns, 2 factor columns, and a single boolean column -- taking care to ensure that our steps prevented generating any missing values where there hadn't previously been any. Ultimately this makes for a dataset with 48,295 rows across 11 features and our variable of interest. Complete steps and code can be located in the `.../code/processing/processingcode.R` file found within the project.
 
 ## Exploratory/Descriptive analysis
 
@@ -71,6 +71,8 @@ Once the data had been loaded and cleaned we began to examine some of the relati
 :::
 
 Finally, we examined the most popular sender domain names for vendors of both spam and legitimate emails. In doing so we see some clear indications of which domains are favorable to spam vendors and which are not. Notably Gmail fails to make the top 25 domains for spam vendors despite being the far-and-away most common choice for legitimate emails. Similarly, Yahoo and Hotmail lead the pack for spam and are not among common domains for legitimate emails. This bodes well for the classification power of sender domain when we enter the modeling phase and begin to incorporate bag-of-words and text processing.
+
+A complete set of exploratory visualization steps utilizing `ggplot2` can be located in the `.../code/eda-code/eda.qmd` file found within the project. 
 
 ## Statistical analysis
 

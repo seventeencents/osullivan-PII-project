@@ -46,7 +46,7 @@ We are saving the results for each of the plots to the `results` folder.
 
 # Data exploration through figures
 
-Density plots for the continuous outcomes -- email body length first.
+Density plots for the continuous outcomes -- email body length first. We'll utilize the `ggplot2` visualization package, which offers a `geom_density` shape that is well suited to visualizing the distributions of multiple groups in the same plot. In our case that will be both spam and legitimate emails. 
 
 ```{r}
 p1 <- mydata %>% ggplot(aes(x = bodylength, fill = label)) +
@@ -60,7 +60,7 @@ figure_file = here::here("results", "figures","bodylength-distribution.png")
 ggsave(filename = figure_file, plot=p1) 
 ```
 
-Now subject line length.
+And we'll produce the same visualization for subject line length.
 
 ```{r}
 p2 <- mydata %>% ggplot(aes(x=subjectlength, fill = label)) +
@@ -73,8 +73,7 @@ plot(p2)
 figure_file = here::here("results", "figures","subjectlength-distribution.png")
 ggsave(filename = figure_file, plot=p2) 
 ```
-
-Now the most common sender domains for spam emails.
+Now the most common sender domains for spam emails. We'll continue to utilize `ggplot2`, this time with the `geom_col` shape in order to produce a bar chart of counts. 
 
 ```{r}
 p3 <- mydata[which(mydata$label == "Yes" & !(mydata$senderdomain == "")),] %>%
@@ -91,6 +90,8 @@ plot(p3)
 figure_file = here::here("results", "figures", "spam-by-domain.png")
 ggsave(filename = figure_file, plot=p3) 
 ```
+And similarly we'll produce a bar chart for legitimate emails. 
+
 ```{r}
 p3 <- mydata[which(mydata$label == "No" & !(mydata$senderdomain == "")),] %>%
       dplyr::count(senderdomain) %>%
