@@ -370,10 +370,12 @@ rf.body.svd.length <- customRF(train.body.svd.length)
 
 saveRDS(rf.body.svd.length, file = here("results", "large-files", "rf-body-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # tune a Random Forest model with body token SVD, email length, and sender domain
-rf.body.svd.length.sender <- customRF(train.body.svd.length.sender)
+#rf.body.svd.length.sender <- customRF(train.body.svd.length.sender)
 
-saveRDS(rf.body.svd.length.sender, file = here("results", "large-files", "rf-body-svd-length-sender.rds"))
+#saveRDS(rf.body.svd.length.sender, file = here("results", "large-files", "rf-body-svd-length-sender.rds"))
 
 ###### Subject Tokens Only ######
 # tune a Random Forest model with subject token SVD
@@ -402,10 +404,12 @@ rf.all.svd.length <- customRF(train.all.svd.length)
 
 saveRDS(rf.all.svd.length, file = here("results", "large-files", "rf-all-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # tune a Random Forest model with all token SVD, email length, and sender domain
-rf.all.svd.length.sender <- customRF(train.all.svd.length.sender)
+#rf.all.svd.length.sender <- customRF(train.all.svd.length.sender)
 
-saveRDS(rf.all.svd.length.sender, file = here("results", "large-files", "rf-all-svd-length-sender.rds"))
+#saveRDS(rf.all.svd.length.sender, file = here("results", "large-files", "rf-all-svd-length-sender.rds"))
 ```
 
 ## SVM Iterations
@@ -422,10 +426,12 @@ svm.body.svd.length <- customSVM(train.body.svd.length)
 
 saveRDS(svm.body.svd.length, file = here("results", "large-files", "svm-body-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # tune an SVM model with body token SVD, email length, and sender domain
-svm.body.svd.length.sender <- customSVM(train.body.svd.length.sender)
+#svm.body.svd.length.sender <- customSVM(train.body.svd.length.sender)
 
-saveRDS(svm.body.svd.length.sender, file = here("results", "large-files", "svm-body-svd-length-sender.rds"))
+#saveRDS(svm.body.svd.length.sender, file = here("results", "large-files", "svm-body-svd-length-sender.rds"))
 
 ###### Subject Tokens Only ######
 # tune an SVM model with subject token SVD
@@ -438,10 +444,12 @@ svm.sub.svd.length <- customSVM(train.sub.svd.length)
 
 saveRDS(svm.sub.svd.length, file = here("results", "large-files", "svm-sub-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # tune an SVM model with subject token SVD, email length, and sender domain
-svm.sub.svd.length.sender <- customSVM(train.sub.svd.length.sender)
+#svm.sub.svd.length.sender <- customSVM(train.sub.svd.length.sender)
 
-saveRDS(svm.sub.svd.length.sender, file = here("results", "large-files", "svm-sub-svd-length-sender.rds"))
+#saveRDS(svm.sub.svd.length.sender, file = here("results", "large-files", "svm-sub-svd-length-sender.rds"))
 
 ###### All Tokens ######
 # tune an SVM model with all token SVD
@@ -454,10 +462,12 @@ svm.all.svd.length <- customSVM(train.all.svd.length)
 
 saveRDS(svm.all.svd.length, file = here("results", "large-files", "svm-all-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # tune an SVM model with all token SVD, email length, and sender domain
-svm.all.svd.length.sender <- customSVM(train.all.svd.length.sender)
+#svm.all.svd.length.sender <- customSVM(train.all.svd.length.sender)
 
-saveRDS(svm.all.svd.length.sender, file = here("results", "large-files", "svm-all-svd-length-sender.rds"))
+#saveRDS(svm.all.svd.length.sender, file = here("results", "large-files", "svm-all-svd-length-sender.rds"))
 ```
 
 # Prepping Test Data for Predictions
@@ -665,9 +675,9 @@ saveRDS(test.all.svd.length.sender, file = here("results", "large-files", "test-
 
 ```{r}
 # predict test data with model
-rf.body.preds <- predict(rf.body, test.body.svd)
-rf.body.length.preds <- predict(rf.body.length, test.body.svd.length)
-rf.body.length.sender.preds <- predict(rf.body.length.sender, test.body.svd.length.sender)
+#rf.body.preds <- predict(rf.body, test.body.svd)
+#rf.body.length.preds <- predict(rf.body.length, test.body.svd.length)
+#rf.body.length.sender.preds <- predict(rf.body.length.sender, test.body.svd.length.sender)
 ```
 
 The `echo: false` option disables the printing of code (only output is displayed).
