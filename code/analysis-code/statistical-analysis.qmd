@@ -388,10 +388,12 @@ rf.sub.svd.length <- customRF(train.sub.svd.length)
 
 saveRDS(rf.sub.svd.length, file = here("results", "large-files", "rf-sub-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # tune a Random Forest model with subject token SVD, email length, and sender domain
-rf.sub.svd.length.sender <- customRF(train.sub.svd.length.sender)
+#rf.sub.svd.length.sender <- customRF(train.sub.svd.length.sender)
 
-saveRDS(rf.sub.svd.length.sender, file = here("results", "large-files", "rf-sub-svd-length-sender.rds"))
+#saveRDS(rf.sub.svd.length.sender, file = here("results", "large-files", "rf-sub-svd-length-sender.rds"))
 
 ###### All Tokens ######
 # tune a Random Forest model with all token SVD
