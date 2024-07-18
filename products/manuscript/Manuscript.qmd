@@ -13,9 +13,11 @@ csl: ../../assets/apa.csl
 ---
 
 ```{r, echo=FALSE, message=FALSE}
-# load a few R packages
-library(here)
-library(knitr)
+# load needed packages. make sure they are installed.
+pacman::p_load(here, #for data loading/saving
+               tidyverse, # for data manipulation and plotting
+               skimr, # for data exploration and summary
+               ggthemes) # for plot theming
 ```
 
 # Summary/Abstract
@@ -32,7 +34,7 @@ library(knitr)
 
 ## Description of data and data source
 
-The data set(s) that I'd liked to examine are a handful of annotated data sets pertaining to fraudulent (spam) emails. They come from a handful of sources, te largest of the bunch is from the Conference on Email and Anti-Spam. That data set and a pair of others found on [Kaggle](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset/data?select=CEAS_08.csv) contain text information from the subjects and bodies of the emails as well as the senders, receivers, timestamps, and whether or not URLs are contained within.
+The data set(s) that I'd liked to examine are a handful of annotated data sets pertaining to fraudulent (spam) emails. They come from a handful of sources, the largest of the bunch is from the Conference on Email and Anti-Spam. That data set and a pair of others can be found on [Kaggle](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset/data?select=CEAS_08.csv) contain text information from the subjects and bodies of the emails as well as the senders, receivers, timestamps, and whether or not URLs are contained within.
 
 ## Questions/Hypotheses to be addressed
 
@@ -60,19 +62,19 @@ By the end of our data loading and processing we arrived at a dataset that conta
 
 Once the data had been loaded and cleaned we began to examine some of the relationships between anticipated predictor variables and our variable of interest.
 
-![](../../results/figures/bodylength-distribution.png){.lightbox} First examining the distribution of email body length between spam and legitimate emails we observe a tendency for spam emails to be shorter in length. However, interestingly the distribution of spam emails is bi-modal -- with a second peak at around the 4,000 character count -- which may indicate that spam vendors are aware of the identification potential of email length and have begun targeting a longer length to avoid notice.
+First examining the distribution of email body length between spam and legitimate emails we observe a tendency for spam emails to be shorter in length. However, interestingly the distribution of spam emails is bi-modal -- with a second peak at around the 4,000 character count -- which may indicate that spam vendors are aware of the identification potential of email length and have begun targeting a longer length to avoid notice. ![](../../results/figures/bodylength-distribution.png){.lightbox}
 
-![](../../results/figures/subjectlength-distribution.png){.lightbox} Similarly, when we examine subject line length we observe the same tendency for spam emails to trend shorter. Subject line does not share the same distinct bi-modal shape for spam emails that the bodies do, but subject line length distribution between both spam and legitimate emails overlap in large part which may reduce it's efficacy for classification modeling.
+Similarly, when we examine subject line length we observe the same tendency for spam emails to trend shorter. Subject line does not share the same distinct bi-modal shape for spam emails that the bodies do, but subject line length distribution between both spam and legitimate emails overlap in large part which may reduce it's efficacy for classification modeling. ![](../../results/figures/subjectlength-distribution.png){.lightbox}
 
-::: {layout-ncol="2"}
-![](../../results/figures/spam-by-domain.png)
+When plotting body tokens we can see that 'http', which precedes most links within each email, is the most common token for each label. Considering this token should approximate not just the presence of a URL, but also the quantity of URLs within each individual email, it will be interesting to see if including the supplied `URLs` boolean will be of value or not in our end model. Given the below, we suspect that the overlap will result in unnecessary noise and dimensionality to our final model. Additionally, considering the above bar chart suggests link presence and quantity is very similarly distributed across both labels, it may wind up improving model performance altogether to exclude 'http' or URL features from the final model.
 
-![](../../results/figures/legit-by-domain.png)
-:::
+![](../../results/figures/popular-body-tokens.png)
 
 Finally, we examined the most popular sender domain names for vendors of both spam and legitimate emails. In doing so we see some clear indications of which domains are favorable to spam vendors and which are not. Notably Gmail fails to make the top 25 domains for spam vendors despite being the far-and-away most common choice for legitimate emails. Similarly, Yahoo and Hotmail lead the pack for spam and are not among common domains for legitimate emails. This bodes well for the classification power of sender domain when we enter the modeling phase and begin to incorporate bag-of-words and text processing.
 
-A complete set of exploratory visualization steps utilizing `ggplot2` can be located in the `.../code/eda-code/eda.qmd` file found within the project. 
+![](../../results/figures/popular-domains.png)
+
+A complete set of exploratory visualization steps utilizing `ggplot2` can be located in the `.../code/eda-code/eda.qmd` file found within the project.
 
 ## Statistical analysis
 
