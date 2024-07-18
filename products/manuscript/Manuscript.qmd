@@ -1,6 +1,5 @@
 ---
 title: "Fishing for Spam"
-subtitle: "Part 1: Project Proposal"
 author: Sean O'Sullivan
 date: "`r Sys.Date()`"
 format:
@@ -38,7 +37,7 @@ The data set(s) that I'd liked to examine are a handful of annotated data sets p
 
 ## Questions/Hypotheses to be addressed
 
-I'd like to explore the features that are prevalent in the identification of spam emails. Utilizing text analysis in addition to the other email attributes supplied my end goal would be to model a classifier that has a high rate of efficacy in identifying spam emails for automated detection as used by some popular email providers and large internal IT departments across the corporate landscape.
+I'd like to explore the features that are prevalent in the identification of spam emails. Utilizing text analysis, in addition to the other email attributes supplied and engineered, my end goal would be to model a classifier that has a high rate of efficacy in identifying spam emails for use of automated detection by some popular email providers and large internal IT departments across the corporate landscape.
 
 I expect that a number of keywords common in spam emails will be relevant, but it's also likely that potential sender domains, whether the sender and receiver domain are the same, and what day of week or time of day the emails are sent are also highly correlated with intentionally spammy behavior.
 

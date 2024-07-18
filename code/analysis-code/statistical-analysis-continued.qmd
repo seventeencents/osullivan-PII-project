@@ -13,13 +13,15 @@ Our first step is to import our processed data set and load in all necessary pac
 # load needed packages. make sure they are installed.
 pacman::p_load(here, #for data loading/saving
                tidyverse, # for data manipulation and plotting
+               skimr, # for data exploration and summary
+               ggthemes, # for plot theming
                tidytext, # for text analysis
                quanteda, # for text analysis
                caret, # for model training
                e1071, # for model training
                randomForest, # for model training
-               xgboost, # for model training
                irlba, # for SVD
+               doSNOW, # for parallel processing
                doParallel, # for parallel processing
                parallel) # for parallel processing
 
@@ -34,15 +36,10 @@ set.seed(490)
 
 ## Train/Test Splits
 
-Next we'll focus on splitting the data into train and test splits. We'll opt to create a partition that leaves us 30% of the processed data set for testing the generalizability of our final model. We'll also want to ensure that class representations are maintained proportionate to the original data set. 
-
-However, before we can proceed with either step we first need to ensure that the size of our data is manageable for the scope of our machine. Modeling a very large corpus of unstructured text data incurs high computational costs due to the increasing dimensionality of the data as we begin to structure it. As a result, the amount of data that can be modeled will vary significantly based on the computational resources available to you. 
-
-At this time we've made the decision to examine a 10% sample of our overall data set for the purpose of modeling on our machine, but the proportion parameter for the subsample partition can be tweaked according to your available resources. 
+Next we'll focus on splitting the data into train and test splits. We'll opt to create a partition that leaves us 30% of the processed data set for testing the generalizability of our final model. We'll also want to ensure that class representations are maintained proportionate to the original data set.
 
 ```{r}
-# create smaller partition for the sake of being able
-# to run on consumer grade hardware 
+# create smaller partition for the sake of being able to run this shit on my PC
 subsample <- createDataPartition(mydata$label,
                                  times = 1,
                                  p = .1,
@@ -50,7 +47,7 @@ subsample <- createDataPartition(mydata$label,
 
 sub.data <- mydata[subsample,]
 
-# create index of train partition
+# create index of partition
 inTrain <- createDataPartition(sub.data$label, 
                                times = 1, 
                                p = 0.7,
@@ -67,8 +64,6 @@ The output of our class proportions look correctly maintained by the `createData
 
 ## Controls and Functions
 
-To reduce repetitive model configurations and parameter tuning grids we'll establish some variables and functions for later use in the analysis.
-
 ```{r}
 # create CV folds and model controls
 folds <- createMultiFolds(train$label,
@@ -77,17 +72,9 @@ folds <- createMultiFolds(train$label,
 ctrl <- trainControl(method = "repeatedcv",
                      number = 10,
                      repeats = 3,
-                     index = folds,
-                     allowParallel = TRUE)
+                     index = folds)
 gridSVM <- expand.grid(C = seq(.1, 1, by = .1),
                        sigma = c(0.01, 0.1, 0.5, 1))
-gridXG <- expand.grid(nrounds = c(100, 200),
-                      max_depth = c(3, 6),
-                      eta = c(0.1, 0.3),
-                      gamma = c(0, 0.1),
-                      colsample_bytree = c(0.8),
-                      min_child_weight = c(1, 3),
-                      subsample = c(0.8))
 
 # function definitions
 # calculate term frequency
@@ -109,16 +96,12 @@ tf.idf <- function(tf, idf) {
 }
 
 # project singular value decomp onto test split
-projSVD <- function(type, trainirlba, testtfidf) {
+projSVD <- function(trainirlba, testtfidf) {
   sigma.inverse <- 1 / trainirlba$d
   u.transpose <- t(trainirlba$u)
   projection <- t(sigma.inverse * u.transpose %*% t(testtfidf))
   projection <- as.data.frame(projection)
-  if (type == "bod") {
-    names(projection) <- paste0("X", seq(1,300))
-  } else {
-    names(projection) <- paste0("Z", seq(1,300))
-  }
+  names(projection) <- paste0("X", seq(1,300))
   return(projection)
 }
 
@@ -132,8 +115,7 @@ customRF <- function(df) {
                  data = df,
                  method = "rf",
                  trControl = ctrl,
-                 tuneLength = 7,
-                 verbose = FALSE)
+                 tuneLength = 7)
   stopCluster(clus)
   return(model)
 }
@@ -149,32 +131,15 @@ customSVM <- function(df) {
                  method = "svmRadial",
                  trControl = ctrl,
                  tuneLength = 7,
-                 tuneGrid = gridSVM,
-                 verbose = FALSE)
-  stopCluster(clus)
-  return(model)
-}
-
-# tune an XGBoost model
-customXG <- function(df) {
-  cores <- detectCores()
-  clus <- makeCluster(cores[1] - 1) # determine the optimal number
-                                                   # of cores for parallel processing
-  registerDoParallel(clus)
-  model <- train(label ~ ., 
-                 data = df,
-                 method = "xgbTree",
-                 trControl = ctrl,
-                 tuneGrid = gridXG,
-                 verbose = FALSE)
+                 tuneGrid = gridSVM)
   stopCluster(clus)
   return(model)
 }
 ```
 
-## Body Tokens and SVD
+To reduce repetitive model configurations and parameter tuning grids we'll establish some variables and functions for later use in the analysis.
 
-Our first step in structuring text data requires that we tokenize the email bodies.
+## Body Tokens and SVD
 
 ```{r}
 # generate tokens from email bodies
@@ -188,7 +153,7 @@ train.body.tokens <- tokens(train$body, what = "word",
                        remove_url = FALSE)
 ```
 
-After which we'll proceed with standardizing and consolidating the tokens. In our case we'll be lowercasing all tokens, removing English stopwords, and consolidating the semantics by stemming the remaining tokens.
+Our first step in structuring text data requires that we tokenize the email bodies.
 
 ```{r}
 # lowercase tokens
@@ -204,7 +169,7 @@ train.body.tokens <- tokens_wordstem(train.body.tokens,
                                      language = "english")
 ```
 
-After we've tokenized we're now able to restructure the data as a document-feature matrix in preparation for calculating term frequencies and inverse document frequencies.
+After which we'll proceed with standardizing and consolidating the tokens. In our case we'll be lowercasing all tokens, removing English stopwords, and consolidating the semantics by stemming the remaining tokens.
 
 ```{r}
 # create document-feature matrix
@@ -215,7 +180,7 @@ train.body.tokens.dfm <- dfm(train.body.tokens,
 train.body.tokens.matrix <- as.matrix(train.body.tokens.dfm)
 ```
 
-We proceed by calculating TF-IDFs for the email body token data. This is valuable because it standardizes the word occurrences and further helps to reduce the influence of over represented words on the model. The TF values will accomplish the former while the IDF values will accomplish the latter by discounting the tokens found consistently throughout the corpus of emails. In the case of tokens found in every email throughout the corpus the end result is effectively complete removal from the model akin to our earlier removal of stop words.
+After we've tokenized we're now able to restructure the data as a document-feature matrix in preparation for calculating term frequencies and inverse document frequencies.
 
 ```{r}
 # create the term frequency
@@ -228,7 +193,7 @@ train.body.tokens.idf <- apply(train.body.tokens.matrix, 2, inverse.doc.freq)
 train.body.tokens.tfidf <- apply(train.body.tokens.tf, 2, tf.idf, idf = train.body.tokens.idf)
 ```
 
-Having reinterpreted our tokens as TF-IDFs we can transpose the matrix back to it's original orientation and fill in zeroes for any tokens that generated NA values (as a result of no representation of the given tokens within the email).
+We proceed by calculating TF-IDFs for the email body token data. This is valuable because it standardizes the word occurrences and further helps to reduce the influence of over represented words on the model. The TF values will accomplish the former while the IDF values will accomplish the latter by discounting the tokens found consistently throughout the corpus of emails. In the case of tokens found in every email throughout the corpus the end result is effectively complete removal from the model akin to our earlier removal of stop words.
 
 ```{r}
 # transpose tf-idf and handle incomplete cases
@@ -237,9 +202,7 @@ incomplete.cases <- which(!complete.cases(train.body.tokens.tfidf))
 train.body.tokens.tfidf[incomplete.cases,] <- rep(0.0, ncol(train.body.tokens.tfidf))
 ```
 
-Finally, we're left with a matrix containing 40,399 features. While many classification models can ultimately accommodate such intense dimensionality, the computational resource requirements are quite high and would therefore make it unfeasible to run these models with the limited memory and processing power available on consumer-grade hardware. Additionally, the sparsity of our matrix (>99.9%) suggests that many of the features will not be particularly predictive of either classification on their own.
-
-As a result, we'll attempt to reduce the dimensionality of our feature set by employing the `irlba` package to perform singular value decomposition with a target feature limit of the 300 most informative predictor combinations.
+Having reinterpreted our tokens as TF-IDFs we can transpose the matrix back to it's original orientation and fill in zeroes for any tokens that generated NA values (as a result of no representation of the given tokens within the email).
 
 ```{r}
 # run singular value decomposition for body tokens
@@ -247,6 +210,10 @@ train.body.irlba <- irlba(t(train.body.tokens.tfidf), nv = 300, maxit = 600)
 
 saveRDS(train.body.irlba, file = here("results", "large-files", "train-body-irlba.rds"))
 ```
+
+Finally, we're left with a matrix containing 40,399 features. While many classification models can ultimately accommodate such intense dimensionality, the computational resource requirements are quite high and would therefore make it unfeasible to run these models with the limited memory and processing power available on consumer-grade hardware. Additionally, the sparsity of our matrix (\>99.9%) suggests that many of the features will not be particularly predictive of either classification on their own.
+
+As a result, we'll attempt to reduce the dimensionality of our feature set by employing the `irlba` package to perform singular value decomposition with a target feature limit of the 300 most informative predictor combinations.
 
 ## Subject Tokens and SVD
 
@@ -316,15 +283,9 @@ train.sub.tokens.tfidf[incomplete.cases,] <- rep(0.0, ncol(train.sub.tokens.tfid
 train.sub.irlba <- irlba(t(train.sub.tokens.tfidf), nv = 300, maxit = 600)
 
 saveRDS(train.sub.irlba, file = here("results", "large-files", "train-sub-irlba.rds"))
-
-train.sub <- as.data.frame(train.sub.irlba$v)
-train.sub <- train.sub %>%
-  rename_all(~ paste0("Z", seq(1, length(names(train.sub)))))
 ```
 
 ## Final Data Frames for Modeling
-
-Having generated structured text data that is also manageable, we can now piece together different data frames consisting of the various feature combinations we would like to assess for modeling. Based on the relationships observed in our exploratory data analysis those features are the token data for both email subject and body, the body length of the email, and the sender domain for the email.
 
 ```{r}
 ####### Body Token Only #######
@@ -350,13 +311,13 @@ saveRDS(train.body.svd.length.sender, file = here("results", "large-files", "tra
 ####### Subject Token Only #######
 # create revised training data frame with subject token SVD
 train.sub.svd <- data.frame(label = train$label,
-                            train.sub)
+                            train.sub.irlba$v)
 saveRDS(train.sub.svd, file = here("results", "large-files", "train-sub-svd.rds"))
 
 # create revised training data frame with subject token SVD and email length
 train.sub.svd.length <- data.frame(label = train$label,
                                    length = train$bodylength,
-                                   train.sub)
+                                   train.sub.irlba$v)
 saveRDS(train.sub.svd.length, file = here("results", "large-files", "train-sub-svd-length.rds"))
 
 # create revised training data frame 
@@ -364,21 +325,21 @@ saveRDS(train.sub.svd.length, file = here("results", "large-files", "train-sub-s
 train.sub.svd.length.sender <- data.frame(label = train$label,
                                           length = train$bodylength,
                                           senderdomain = train$senderdomain,
-                                          train.sub)
+                                          train.sub.irlba$v)
 saveRDS(train.sub.svd.length.sender, file = here("results", "large-files", "train-sub-svd-length-sender.rds"))
 
 ####### All Tokens #######
 # create revised training data frame with all tokens SVD
 train.all.svd <- data.frame(label = train$label,
                             train.body.irlba$v,
-                            train.sub)
+                            train.sub.irlba$v)
 saveRDS(train.all.svd, file = here("results", "large-files", "train-all-svd.rds"))
 
 # create revised training data frame with all tokens SVD and email length
 train.all.svd.length <- data.frame(label = train$label,
                                    length = train$bodylength,
                                    train.body.irlba$v,
-                                   train.sub)
+                                   train.sub.irlba$v)
 saveRDS(train.all.svd.length, file = here("results", "large-files", "train-all-svd-length.rds"))
 
 # create revised training data frame 
@@ -387,9 +348,11 @@ train.all.svd.length.sender <- data.frame(label = train$label,
                                           length = train$bodylength,
                                           senderdomain = train$senderdomain,
                                           train.body.irlba$v,
-                                          train.sub)
+                                          train.sub.irlba$v)
 saveRDS(train.all.svd.length.sender, file = here("results", "large-files", "train-all-svd-length-sender.rds"))
 ```
+
+Having generated structured text data that is also manageable, we can now piece together different data frames consisting of the various feature combinations we would like to assess for modeling. Based on the relationships observed in our exploratory data analysis those features are the token data for both email subject and body, the body length of the email, and the sender domain for the email.
 
 # Tune Models
 
@@ -509,65 +472,6 @@ saveRDS(svm.all.svd.length, file = here("results", "large-files", "svm-all-svd-l
 #saveRDS(svm.all.svd.length.sender, file = here("results", "large-files", "svm-all-svd-length-sender.rds"))
 ```
 
-## XGBoost Iterations
-
-```{r}
-###### Body Tokens Only ######
-# tune an XGBoost model with body token SVD
-xg.body.svd <- customXG(train.body.svd)
-
-saveRDS(xg.body.svd, file = here("results", "large-files", "xg-body-svd.rds"))
-
-# tune an XGBoost model with body token SVD and email length
-xg.body.svd.length <- customXG(train.body.svd.length)
-
-saveRDS(xg.body.svd.length, file = here("results", "large-files", "xg-body-svd-length.rds"))
-
-### can't be run in a reasonable timeframe
-### too computationally intensive for a MacBook
-# tune an XGBoost model with body token SVD, email length, and sender domain
-#xg.body.svd.length.sender <- customXG(train.body.svd.length.sender)
-
-#saveRDS(xg.body.svd.length.sender, file = here("results", "large-files", "xg-body-svd-length-sender.rds"))
-
-###### Subject Tokens Only ######
-# tune an XGBoost model with subject token SVD
-xg.sub.svd <- customXG(train.sub.svd)
-
-saveRDS(xg.sub.svd, file = here("results", "large-files", "xg-sub-svd.rds"))
-
-# tune an XGBoost model with subject token SVD and email length
-xg.sub.svd.length <- customXG(train.sub.svd.length)
-
-saveRDS(xg.sub.svd.length, file = here("results", "large-files", "xg-sub-svd-length.rds"))
-
-### can't be run in a reasonable timeframe
-### too computationally intensive for a MacBook
-# tune an XGBoost model with subject token SVD, email length, and sender domain
-#xg.sub.svd.length.sender <- customXG(train.sub.svd.length.sender)
-
-#saveRDS(xg.sub.svd.length.sender, file = here("results", "large-files", "xg-sub-svd-length-sender.rds"))
-
-###### All Tokens ######
-# tune an XGBoost model with all token SVD
-xg.all.svd <- customXG(train.all.svd)
-
-saveRDS(xg.all.svd, file = here("results", "large-files", "xg-all-svd.rds"))
-
-# tune an XGBoost model with all token SVD and email length
-xg.all.svd.length <- customXG(train.all.svd.length)
-
-saveRDS(xg.all.svd.length, file = here("results", "large-files", "xg-all-svd-length.rds"))
-
-### can't be run in a reasonable timeframe
-### too computationally intensive for a MacBook
-# tune an XGBoost model with all token SVD, email length, and sender domain
-#xg.all.svd.length.sender <- customXG(train.all.svd.length.sender)
-
-#saveRDS(xg.all.svd.length.sender, file = here("results", "large-files", "xg-all-svd-length-sender.rds"))
-```
-
-
 # Prepping Test Data for Predictions
 
 ## Body Tokens and SVD
@@ -630,12 +534,10 @@ Finally we'll be using the same SVD process as was used on the training data. We
 
 ```{r}
 # project the SVD from the train split onto the test split
-test.body.svd.proj <- projSVD("bod", train.body.irlba, test.body.tokens.tfidf)
+test.body.svd.proj <- projSVD(train.body.irlba, test.body.tokens.tfidf)
 ```
 
 ## Subject Tokens and SVD
-
-*This section features the same steps as above, but now for the email subject text. Justifications for each process will be the same as before.*
 
 ```{r}
 # generate tokens from test email bodies
@@ -695,12 +597,10 @@ test.sub.tokens.tfidf[is.na(test.sub.tokens.tfidf)] <- 0.0
 
 ```{r}
 # project the SVD from the train split onto the test split
-test.sub.svd.proj <- projSVD("sub", train.sub.irlba, test.sub.tokens.tfidf)
+test.sub.svd.proj <- projSVD(train.sub.irlba, test.sub.tokens.tfidf)
 ```
 
 ## Final Data Frames for Predictions
-
-Having now completed the transformations necessary to map the test data into the same space as the training data used for modeling we can proceed with making predictions and assessing model performance. The latter of which will be continued in a second statistical analysis `.QMD` file using the pertinent, saved `.RDS` files from this document. 
 
 ```{r}
 ####### Body Token Only #######
@@ -774,10 +674,5 @@ saveRDS(test.all.svd.length.sender, file = here("results", "large-files", "test-
 ```
 
 
-```{r}
-xg.body.svd.preds <- predict(xg.body.svd, test.body.svd)
-confusionMatrix(xg.body.svd.preds, test.body.svd$label)
-xg.all.svd.preds <- predict(xg.all.svd, test.all.svd)
-confusionMatrix(xg.all.svd.preds, test.all.svd$label)
-```
 
+The `echo: false` option disables the printing of code (only output is displayed).

@@ -110,6 +110,7 @@ tf.idf <- function(tf, idf) {
 
 # project singular value decomp onto test split
 projSVD <- function(type, trainirlba, testtfidf) {
+  
   sigma.inverse <- 1 / trainirlba$d
   u.transpose <- t(trainirlba$u)
   projection <- t(sigma.inverse * u.transpose %*% t(testtfidf))
@@ -317,9 +318,9 @@ train.sub.irlba <- irlba(t(train.sub.tokens.tfidf), nv = 300, maxit = 600)
 
 saveRDS(train.sub.irlba, file = here("results", "large-files", "train-sub-irlba.rds"))
 
-train.sub <- as.data.frame(train.sub.irlba$v)
-train.sub <- train.sub %>%
-  rename_all(~ paste0("Z", seq(1, length(names(train.sub)))))
+sub.svd <- as.data.frame(train.sub.irlba$v)
+sub.svd <- sub.svd %>%
+  rename_all(~ paste0("Z", seq(1, length(names(sub.svd)))))
 ```
 
 ## Final Data Frames for Modeling
@@ -350,13 +351,13 @@ saveRDS(train.body.svd.length.sender, file = here("results", "large-files", "tra
 ####### Subject Token Only #######
 # create revised training data frame with subject token SVD
 train.sub.svd <- data.frame(label = train$label,
-                            train.sub)
+                            sub.svd)
 saveRDS(train.sub.svd, file = here("results", "large-files", "train-sub-svd.rds"))
 
 # create revised training data frame with subject token SVD and email length
 train.sub.svd.length <- data.frame(label = train$label,
                                    length = train$bodylength,
-                                   train.sub)
+                                   sub.svd)
 saveRDS(train.sub.svd.length, file = here("results", "large-files", "train-sub-svd-length.rds"))
 
 # create revised training data frame 
@@ -364,21 +365,21 @@ saveRDS(train.sub.svd.length, file = here("results", "large-files", "train-sub-s
 train.sub.svd.length.sender <- data.frame(label = train$label,
                                           length = train$bodylength,
                                           senderdomain = train$senderdomain,
-                                          train.sub)
+                                          sub.svd)
 saveRDS(train.sub.svd.length.sender, file = here("results", "large-files", "train-sub-svd-length-sender.rds"))
 
 ####### All Tokens #######
 # create revised training data frame with all tokens SVD
 train.all.svd <- data.frame(label = train$label,
                             train.body.irlba$v,
-                            train.sub)
+                            sub.svd)
 saveRDS(train.all.svd, file = here("results", "large-files", "train-all-svd.rds"))
 
 # create revised training data frame with all tokens SVD and email length
 train.all.svd.length <- data.frame(label = train$label,
                                    length = train$bodylength,
                                    train.body.irlba$v,
-                                   train.sub)
+                                   sub.svd)
 saveRDS(train.all.svd.length, file = here("results", "large-files", "train-all-svd-length.rds"))
 
 # create revised training data frame 
@@ -387,7 +388,7 @@ train.all.svd.length.sender <- data.frame(label = train$label,
                                           length = train$bodylength,
                                           senderdomain = train$senderdomain,
                                           train.body.irlba$v,
-                                          train.sub)
+                                          sub.svd)
 saveRDS(train.all.svd.length.sender, file = here("results", "large-files", "train-all-svd-length-sender.rds"))
 ```
 
@@ -630,7 +631,7 @@ Finally we'll be using the same SVD process as was used on the training data. We
 
 ```{r}
 # project the SVD from the train split onto the test split
-test.body.svd.proj <- projSVD("bod", train.body.irlba, test.body.tokens.tfidf)
+test.body.svd.proj <- projSVD(train.body.irlba, test.body.tokens.tfidf)
 ```
 
 ## Subject Tokens and SVD
@@ -695,7 +696,7 @@ test.sub.tokens.tfidf[is.na(test.sub.tokens.tfidf)] <- 0.0
 
 ```{r}
 # project the SVD from the train split onto the test split
-test.sub.svd.proj <- projSVD("sub", train.sub.irlba, test.sub.tokens.tfidf)
+test.sub.svd.proj <- projSVD(train.sub.irlba, test.sub.tokens.tfidf)
 ```
 
 ## Final Data Frames for Predictions
@@ -777,7 +778,7 @@ saveRDS(test.all.svd.length.sender, file = here("results", "large-files", "test-
 ```{r}
 xg.body.svd.preds <- predict(xg.body.svd, test.body.svd)
 confusionMatrix(xg.body.svd.preds, test.body.svd$label)
-xg.all.svd.preds <- predict(xg.all.svd, test.all.svd)
-confusionMatrix(xg.all.svd.preds, test.all.svd$label)
+xg.all.svd.length.preds <- predict(xg.all.svd.length, test.all.svd.length)
+confusionMatrix(xg.all.svd.length.preds, test.body.svd$label)
 ```
 
