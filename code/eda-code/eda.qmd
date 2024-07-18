@@ -7,25 +7,22 @@ output: html_document
 # Setup
 
 ```{r}
-#load needed packages. make sure they are installed.
-library(here) #for data loading/saving
-library(dplyr)
-library(skimr)
-library(ggplot2)
-library(forcats)
-library(plyr)
-library(ggthemes)
+# load needed packages. make sure they are installed.
+pacman::p_load(here, #for data loading/saving
+               tidyverse, # for data manipulation and plotting
+               skimr, # for data exploration and summary
+               ggthemes, # for plot theming
+               tidytext) # for text analysis
 ```
 
 
 Load the data.
 
 ```{r}
-#Path to data. Note the use of the here() package and not absolute paths
+# path to data
 data_location <- here::here("data","processed-data","processeddata.rds")
-#load data
+# load data
 mydata <- readRDS(data_location)
-mydata$label = fct_recode(mydata$label, "No" = "0", "Yes" = "1")
 ```
 
 
@@ -48,68 +45,129 @@ We are saving the results for each of the plots to the `results` folder.
 
 Density plots for the continuous outcomes -- email body length first. We'll utilize the `ggplot2` visualization package, which offers a `geom_density` shape that is well suited to visualizing the distributions of multiple groups in the same plot. In our case that will be both spam and legitimate emails. 
 
-```{r}
+```{r, warning=FALSE}
 p1 <- mydata %>% ggplot(aes(x = bodylength, fill = label)) +
       geom_density(position = "dodge", alpha = 0.5) +
       xlim(0,7500) + xlab("Length") + ylab("Density") +
-      labs(title = "Body Distribution", caption = "x-axis limited to a maximum of 7,500", fill = "Spam") +
+      labs(title = "Body Distribution", caption = "x-axis limited to a maximum of 7,500", fill = NULL) +
+      scale_y_continuous(labels = scales::percent) +
       theme_tufte() +
       theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom")
 plot(p1)
 figure_file = here::here("results", "figures","bodylength-distribution.png")
-ggsave(filename = figure_file, plot=p1) 
+ggsave(filename = figure_file, plot = p1) 
 ```
 
 And we'll produce the same visualization for subject line length.
 
-```{r}
+```{r, warning=FALSE}
 p2 <- mydata %>% ggplot(aes(x=subjectlength, fill = label)) +
       geom_density(position = "dodge", alpha = 0.5) +
       xlim(0,150) + xlab("Length") + ylab("Density") +
-      labs(title = "Subject Line Distribution", caption = "x-axis limited to a maximum of 150", fill = "Spam") +
+      labs(title = "Subject Line Distribution", caption = "x-axis limited to a maximum of 150", fill = NULL) +
+      scale_y_continuous(labels = scales::percent) +
       theme_tufte() +
       theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom")
 plot(p2)
 figure_file = here::here("results", "figures","subjectlength-distribution.png")
-ggsave(filename = figure_file, plot=p2) 
+ggsave(filename = figure_file, plot = p2) 
 ```
-Now the most common sender domains for spam emails. We'll continue to utilize `ggplot2`, this time with the `geom_col` shape in order to produce a bar chart of counts. 
+Now the most common sender domains by both spam and legitimate emails. We'll continue to utilize `ggplot2`, this time with the `geom_col` shape in order to produce a bar chart of counts faceted by the label. 
 
 ```{r}
-p3 <- mydata[which(mydata$label == "Yes" & !(mydata$senderdomain == "")),] %>%
-      dplyr::count(senderdomain) %>%
-      arrange(desc(n)) %>%
-      head(25) %>%
-      ggplot(aes(x = n, y = fct_reorder(senderdomain, n))) +
-      geom_col(fill = "turquoise3", colour = "black", alpha = 0.65) +
-      labs(title = "Spam Emails by Sender Domain") +
-      ylab("") + xlab("Count") +
-      theme_tufte() +
-      theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5), legend.position = "none")
+p3 <- mydata %>% 
+        select(label, senderdomain) %>% 
+        filter(!senderdomain == "") %>% 
+        count(label, senderdomain) %>% 
+        group_by(label) %>% 
+        slice_max(n, n = 10) %>% 
+        ungroup() %>% 
+        mutate(senderdomain = reorder(senderdomain, n)) %>% 
+        ggplot(aes(n, senderdomain, fill = label)) +
+        geom_col() +
+        facet_wrap(~label, scales = "free") +
+        labs(title = "Most Popular Sender Domains by Type") +
+        ylab(NULL) + xlab(NULL) +
+        scale_x_continuous(labels = scales::comma) +
+        theme_tufte() +
+        theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5), legend.position = "none")
 plot(p3)
-figure_file = here::here("results", "figures", "spam-by-domain.png")
-ggsave(filename = figure_file, plot=p3) 
+figure_file = here::here("results", "figures", "popular-domains.png")
+ggsave(filename = figure_file, plot = p3) 
 ```
-And similarly we'll produce a bar chart for legitimate emails. 
 
 ```{r}
-p3 <- mydata[which(mydata$label == "No" & !(mydata$senderdomain == "")),] %>%
-      dplyr::count(senderdomain) %>%
-      arrange(desc(n)) %>%
-      head(25) %>%
-      ggplot(aes(x = n, y = fct_reorder(senderdomain, n))) +
-      geom_col(fill = "red3", colour = "black", alpha = 0.35) +
-      labs(title = "Legit Emails by Sender Domain") +
-      ylab("") + xlab("Count") +
-      theme_tufte() +
-      theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5), legend.position = "none")
-plot(p3)
-figure_file = here::here("results", "figures", "legit-by-domain.png")
-ggsave(filename = figure_file, plot=p3) 
+# plot the most popular email body tokens
+p4 <- mydata %>%
+        select(label, subject) %>% 
+        unnest_tokens(word, subject) %>% 
+        anti_join(stop_words) %>% 
+        filter(!grepl('[0-9]', word)) %>% 
+        count(label, word) %>% 
+        group_by(label) %>% 
+        slice_max(n, n = 15) %>% 
+        ungroup() %>% 
+        mutate(word = reorder(word, n)) %>% 
+        ggplot(aes(n, word, fill = label)) +
+        geom_col() +
+        facet_wrap(~label, scales = "free") +
+        labs(title = "Most Popular Subject Tokens by Type") +
+        ylab(NULL) + xlab(NULL) +
+        scale_x_continuous(labels = scales::comma) +
+        theme_tufte() +
+        theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5), legend.position = "none")
+plot(p4)
+figure_file = here::here("results", "figures", "popular-subject-tokens.png")
+ggsave(filename = figure_file, plot = p4) 
+
+p5 <- mydata %>%
+        select(label, body) %>% 
+        unnest_tokens(word, body) %>% 
+        anti_join(stop_words) %>% 
+        filter(!grepl('[0-9]', word)) %>% 
+        count(label, word) %>% 
+        group_by(label) %>% 
+        slice_max(n, n = 15) %>% 
+        ungroup() %>% 
+        mutate(word = reorder(word, n)) %>% 
+        ggplot(aes(n, word, fill = label)) +
+        geom_col() +
+        facet_wrap(~label, scales = "free") +
+        labs(title = "Most Popular Body Tokens by Type") +
+        ylab(NULL) + xlab(NULL) +
+        scale_x_continuous(labels = scales::comma) +
+        theme_tufte() +
+        theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5), legend.position = "none")
+plot(p5)
+figure_file = here::here("results", "figures", "popular-body-tokens.png")
+ggsave(filename = figure_file, plot = p5) 
 ```
 
-# Notes
+Similarly we can plot the most common body tokens and the most common subject tokens to get an idea of the word choice between the two labels. 
 
-For your own explorations, tables and figures can be "quick and dirty". As long as you can see what's going on, there is no need to polish them. That's in contrast to figures you'll produce for your final products (paper, report, presentation, website, etc.). Those should look as nice, polished and easy to understand as possible.
+When plotting subject tokens we can see completely distinct collections of the most popular tokens across labels. This bodes well for subject tokens as a potential feature component to supplement analysis of the email bodies with in our final model.  
 
+When plotting body tokens we can see that 'http', which precedes most links within each email, is the most common token for each label. Considering this token should approximate not just the presence of a URL, but also the quantity of URLs within each individual email, it will be interesting to see if including the supplied `URLs` boolean will be of value or not in our end model. We suspect that the overlap will result in unnecessary noise and dimensionality to our final model. Additionally, considering the above bar chart suggests link presence and quantity is very similarly distributed across both labels, it may wind up improving model performance altogether to exclude 'http' or URL features from the final model. 
+
+```{r, warning=FALSE}
+p6 <- mydata %>% 
+        select(label, recursive) %>% 
+        count(label, recursive) %>% 
+        group_by(label) %>% 
+        summarize(percent = n / sum(n)) %>% 
+        ungroup() %>% 
+        filter(percent < .5) %>% 
+        ggplot(aes(label, percent, fill = label)) +
+        geom_col() +
+        labs(title = "Emails with the Same Sender/Receiver") +
+        ylab(NULL) + xlab(NULL) +
+        scale_y_continuous(labels = scales::percent) +
+        theme_tufte() +
+        theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5), legend.position = "none")
+plot(p6)
+figure_file = here::here("results", "figures", "recursive-emails.png")
+ggsave(filename = figure_file, plot = p6) 
+```
+
+Lastly, we examine an engineered feature called `recursive`. This feature is a boolean for whether or not the sender and receiver emails are the same. A common strategy when sending emails in bulk is to include the sender email in the To line while hiding a large list of recipients within the BCC line. In order to see if this is a strategy employed significantly by spam email senders we plotted the percentage of recursive emails for both legitimate and spam emails. We can see that in both cases the percentages are quite low (<2.5%) with only about a 0.7% difference between the two labels. Based on this, it seems unlikely that this feature will warrant further investigation or inclusion in our final model. 
 

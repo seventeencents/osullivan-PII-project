@@ -12,12 +12,10 @@
 
 ## ---- packages --------
 # load needed packages. make sure they are installed.
-library(dplyr) # for data processing/cleaning
-library(tidyverse) # for data processing/cleaning
-library(skimr) # for nice visualization of data 
-library(here) # to set paths
-library(lubridate) # to convert datetimes
-library(stringr) # to perform regex extractions
+pacman::p_load(tidyverse, # for data processing/cleaning
+               skimr, # for nice visualization of data
+               here, # to set paths
+               lubridate) # to convert datetimes
 
 
 ## ---- loaddata --------
@@ -70,19 +68,22 @@ processeddata <- processeddata %>%
 # some sender and receiver emails either lack an email address or lack any attached contact name to be removed
 # we utilize the dplyr 'if_else' function to handle separate cases and ensure we're returning consistent
 # results throughout all rows of the dataset
-processeddata <- processeddata %>% mutate(
-                                          recursive = processeddata$sender == processeddata$receiver,
-                                          senderdomain = if_else(
-                                                                is.na(str_extract(processeddata$sender, "(?<=@).*")),
-                                                                "",
-                                                                str_extract(processeddata$sender, "(?<=@).*")
-                                                                ),
-                                          receiverdomain = if_else(
-                                                                  is.na(str_extract(processeddata$receiver, "(?<=@).*")),
-                                                                  "",
-                                                                  str_extract(processeddata$receiver, "(?<=@).*")
-                                                                  ),
-                                          )
+processeddata <- processeddata %>% 
+                  mutate(
+                        recursive = processeddata$sender == processeddata$receiver,
+                        senderdomain = if_else(
+                                              is.na(str_extract(processeddata$sender, "(?<=@).*")),
+                                              "",
+                                              str_extract(processeddata$sender, "(?<=@).*")
+                                              ),
+                        receiverdomain = if_else(
+                                                is.na(str_extract(processeddata$receiver, "(?<=@).*")),
+                                                "",
+                                                str_extract(processeddata$receiver, "(?<=@).*")
+                                                )) %>% 
+                  mutate(senderdomain = as.factor(senderdomain),
+                         receiverdomain = as.factor(receiverdomain))
+processeddata$label <- fct_recode(processeddata$label, "Legitimate" = "0", "Spam" = "1")
 skimr::skim(processeddata)
 
 ## ---- savedata --------
