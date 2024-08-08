@@ -3,6 +3,7 @@ title: "Fishing for Spam"
 author: Sean O'Sullivan
 format:
   docx:
+    df-print: kable
     toc: false
     number-sections: true
     highlight-style: github
@@ -135,7 +136,7 @@ The following table contains the results of each model:
 
 ```{r}
 cm.df <- readRDS(here("results", "tables", "confusion-matrix-compared.rds"))
-cm.df
+cm.df %>% select(Model, F1, Recall, Precision, `Balanced Accuracy`)
 ```
 
 Here we can see that the XGBoost model with only email body tokens seems to achieve the best balance of both F1 score and Recall. The optimal tuning parameters for this model are listed below:
