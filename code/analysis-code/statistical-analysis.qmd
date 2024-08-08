@@ -133,7 +133,8 @@ customRF <- function(df) {
                  method = "rf",
                  trControl = ctrl,
                  tuneLength = 7,
-                 verbose = FALSE)
+                 verbose = FALSE,
+                 allowParellel = TRUE)
   stopCluster(clus)
   return(model)
 }
@@ -150,7 +151,9 @@ customSVM <- function(df) {
                  trControl = ctrl,
                  tuneLength = 7,
                  tuneGrid = gridSVM,
-                 verbose = FALSE)
+                 probability = T,
+                 verbose = FALSE,
+                 allowParellel = TRUE)
   stopCluster(clus)
   return(model)
 }
@@ -166,7 +169,8 @@ customXG <- function(df) {
                  method = "xgbTree",
                  trControl = ctrl,
                  tuneGrid = gridXG,
-                 verbose = FALSE)
+                 verbose = FALSE,
+                 allowParellel = TRUE)
   stopCluster(clus)
   return(model)
 }
@@ -700,7 +704,7 @@ test.sub.svd.proj <- projSVD("sub", train.sub.irlba, test.sub.tokens.tfidf)
 
 ## Final Data Frames for Predictions
 
-Having now completed the transformations necessary to map the test data into the same space as the training data used for modeling we can proceed with making predictions and assessing model performance. The latter of which will be continued in a second statistical analysis `.QMD` file using the pertinent, saved `.RDS` files from this document. 
+Having now completed the transformations necessary to map the test data into the same space as the training data used for modeling we can proceed with making predictions and assessing model performance. The latter of which will be continued in a second `statistical-analysis-continued.qmd` file using the pertinent, saved `.rds` files from this document. These files have been excluded from any GitHub commits, because of the generous sizes of each model's data file. In order to proceed with the next notebook you'll need to generate the model files on your local machine first.
 
 ```{r}
 ####### Body Token Only #######
@@ -717,13 +721,15 @@ test.body.svd.length <- cbind(label = test$label,
 
 saveRDS(test.body.svd.length, file = here("results", "large-files", "test-body-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # create data frame of body tokens and labels
-test.body.svd.length.sender <- cbind(label = test$label,
-                                     length = test$bodylength,
-                                     senderdomain = test$senderdomain,
-                                     test.body.svd.proj)
+#test.body.svd.length.sender <- cbind(label = test$label,
+#                                     length = test$bodylength,
+#                                     senderdomain = test$senderdomain,
+#                                     test.body.svd.proj)
 
-saveRDS(test.body.svd.length.sender, file = here("results", "large-files", "test-body-svd-length-sender.rds"))
+#saveRDS(test.body.svd.length.sender, file = here("results", "large-files", "test-body-svd-length-sender.rds"))
 
 ####### Subject Token Only #######
 # create data frame of subject tokens and labels
@@ -739,13 +745,15 @@ test.sub.svd.length <- cbind(label = test$label,
 
 saveRDS(test.sub.svd.length, file = here("results", "large-files", "test-sub-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # create data frame of subject tokens and labels
-test.sub.svd.length.sender <- cbind(label = test$label,
-                                    length = test$bodylength,
-                                    senderdomain = test$senderdomain,
-                                    test.sub.svd.proj)
+#test.sub.svd.length.sender <- cbind(label = test$label,
+#                                    length = test$bodylength,
+#                                    senderdomain = test$senderdomain,
+#                                    test.sub.svd.proj)
 
-saveRDS(test.sub.svd.length.sender, file = here("results", "large-files", "test-sub-svd-length-sender.rds"))
+#saveRDS(test.sub.svd.length.sender, file = here("results", "large-files", "test-sub-svd-length-sender.rds"))
 
 ####### All Tokens #######
 # create data frame of all tokens and labels
@@ -763,21 +771,15 @@ test.all.svd.length <- cbind(label = test$label,
 
 saveRDS(test.all.svd.length, file = here("results", "large-files", "test-all-svd-length.rds"))
 
+### can't be run in a reasonable timeframe
+### too computationally intensive for a MacBook
 # create data frame of all tokens and labels
-test.all.svd.length.sender <- cbind(label = test$label,
-                                    length = test$bodylength,
-                                    senderdomain = test$senderdomain,
-                                    test.body.svd.proj,
-                                    test.sub.svd.proj)
+#test.all.svd.length.sender <- cbind(label = test$label,
+#                                    length = test$bodylength,
+#                                    senderdomain = test$senderdomain,
+#                                    test.body.svd.proj,
+#                                    test.sub.svd.proj)
 
-saveRDS(test.all.svd.length.sender, file = here("results", "large-files", "test-all-svd-length-sender.rds"))
-```
-
-
-```{r}
-xg.body.svd.preds <- predict(xg.body.svd, test.body.svd)
-confusionMatrix(xg.body.svd.preds, test.body.svd$label)
-xg.all.svd.preds <- predict(xg.all.svd, test.all.svd)
-confusionMatrix(xg.all.svd.preds, test.all.svd$label)
+#saveRDS(test.all.svd.length.sender, file = here("results", "large-files", "test-all-svd-length-sender.rds"))
 ```
 

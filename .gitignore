@@ -34,5 +34,11 @@
 # Folder for large files
 results/large-files/*
 
+# original raw data files in .csv form
+data/raw-data/CEAS_08.csv
+data/raw-data/Nazario.csv
+data/raw-data/Nigerian_Fraud.csv
+data/raw-data/SpamAssasin.csv
+
 # But we want to commit the folder and the readme!
 !results/large-files/readme.md

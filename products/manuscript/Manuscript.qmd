@@ -1,7 +1,6 @@
 ---
 title: "Fishing for Spam"
 author: Sean O'Sullivan
-date: "`r Sys.Date()`"
 format:
   docx:
     toc: false
@@ -9,45 +8,42 @@ format:
     highlight-style: github
 bibliography: ../../assets/dataanalysis-references.bib
 csl: ../../assets/apa.csl
+nocite: |
+  @*
+execute:
+  echo: false
 ---
 
-```{r, echo=FALSE, message=FALSE}
+```{r, message=FALSE}
 # load needed packages. make sure they are installed.
 pacman::p_load(here, #for data loading/saving
                tidyverse, # for data manipulation and plotting
                skimr, # for data exploration and summary
+               pROC,
                ggthemes) # for plot theming
 ```
 
 # Summary/Abstract
 
-*Write a summary of your project.*
+This study explores the efficacy of advanced machine learning techniques in classifying emails as either spam or legitimate. The process begins with tokenization -- converting email text into meaningful tokens. Term Frequency-Inverse Document Frequency (TF-IDF) is then applied to transform these tokens into numerical features that reflect their importance across the data set. To reduce dimensionality and capture the most significant patterns, Singular Value Decomposition (SVD) is then employed, enhancing the efficiency and performance of the subsequent models. Repeated cross-validation is used to ensure robust and reliable model evaluation as three powerful classifiers — Random Forest, Radial Support Vector Machines (SVM), and XGBoost — are trained and compared. The performance of each model is assessed using Recall and F1 scores to ensure their ability to effectively distinguish between spam and legitimate emails while erring on the side of maximizing as many true positives as possible. The results highlight the potential of combining tokenization, TF-IDF, SVD, and repeated cross-validation in building high-performance, black-box email classification systems. Conversely, they demonstrate the difficulty of maintaining human interpretability when data sets are large and dimensionality is high.
 
 {{< pagebreak >}}
 
 # Introduction
 
-## General Background Information
+## Description of the Data
 
-*Provide enough background on your topic that others can understand the why and how of your analysis*
+The data set(s) that we're examining are a handful of annotated data sets pertaining to fraudulent (spam) emails. They come from a handful of sources, the largest of the bunch is from the Conference on Email and Anti-Spam. That data set and a pair of others can be found on [Kaggle](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset/data?select=CEAS_08.csv) contain text information from the subjects and bodies of the emails as well as the senders, receivers, timestamps, and whether or not URLs are contained within.
 
-## Description of data and data source
+## Hypotheses to Be Addressed
 
-The data set(s) that I'd liked to examine are a handful of annotated data sets pertaining to fraudulent (spam) emails. They come from a handful of sources, the largest of the bunch is from the Conference on Email and Anti-Spam. That data set and a pair of others can be found on [Kaggle](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset/data?select=CEAS_08.csv) contain text information from the subjects and bodies of the emails as well as the senders, receivers, timestamps, and whether or not URLs are contained within.
+The purpose of this project is to explore the features that are prevalent in the identification of spam emails. Utilizing text analysis, in addition to the other email attributes supplied and engineered, my end goal is to be able to model a classifier that has a high rate of efficacy in identifying spam emails for use of automated detection by some popular email providers and large internal IT departments across the corporate landscape.
 
-## Questions/Hypotheses to be addressed
+We expect that a number of keywords common in spam emails will be relevant, but it's also likely that potential sender domains, whether the sender and receiver domain are the same, and the length of the email body or subject also highly correlated with intentionally spammy behavior.
 
-I'd like to explore the features that are prevalent in the identification of spam emails. Utilizing text analysis, in addition to the other email attributes supplied and engineered, my end goal would be to model a classifier that has a high rate of efficacy in identifying spam emails for use of automated detection by some popular email providers and large internal IT departments across the corporate landscape.
+While there may be some models better suited for this than others, our intent is to attempt a handful of ensemble, rule-based classifiers and parameter hyper-tuning in order to compare and determine the best overall predictor of spam emails.
 
-I expect that a number of keywords common in spam emails will be relevant, but it's also likely that potential sender domains, whether the sender and receiver domain are the same, and what day of week or time of day the emails are sent are also highly correlated with intentionally spammy behavior.
-
-While there may be some models better suited for this than others I intend to attempt a handful of classifiers and parameter hyper-tuning in order to compare and determine the best overall predictor of spam emails.
-
-To cite other work (important everywhere, but likely happens first in introduction), make sure your references are in the bibtex file specified in the YAML header above and have the right bibtex key. Then you can include like this:
-
-Examples of reproducible research projects can for instance be found in [@mckay2020; @mckay2020a].
-
-## Data import and cleaning
+## Data Import and Cleaning
 
 To begin we start by downloading our data files of interest from [Kaggle](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset/data?select=CEAS_08.csv). While there are a handful provided at the prior link we're mostly interested in the 3 CSV files that contain 6 features in addition to the spam annotation labels. Next we'll load the data into R with the `read_csv` and `here` functions. Once each of the 3 files is individually loaded into R we append the separate dataframes to one another by way of the `dplyr::bind_rows` function and start to summarize our cumulative data so that we can assess what data cleaning steps and feature generation is necessary.
 
@@ -57,11 +53,13 @@ In addition to cleaning some of the existing features we also sought to generate
 
 By the end of our data loading and processing we arrived at a dataset that contains 7 character columns, 2 numeric columns, 2 factor columns, and a single boolean column -- taking care to ensure that our steps prevented generating any missing values where there hadn't previously been any. Ultimately this makes for a dataset with 48,295 rows across 11 features and our variable of interest. Complete steps and code can be located in the `.../code/processing/processingcode.R` file found within the project.
 
-## Exploratory/Descriptive analysis
+## Exploratory Analysis
 
 Once the data had been loaded and cleaned we began to examine some of the relationships between anticipated predictor variables and our variable of interest.
 
-First examining the distribution of email body length between spam and legitimate emails we observe a tendency for spam emails to be shorter in length. However, interestingly the distribution of spam emails is bi-modal -- with a second peak at around the 4,000 character count -- which may indicate that spam vendors are aware of the identification potential of email length and have begun targeting a longer length to avoid notice. ![](../../results/figures/bodylength-distribution.png){.lightbox}
+First examining the distribution of email body length between spam and legitimate emails we observe a tendency for spam emails to be shorter in length. However, interestingly the distribution of spam emails is bi-modal -- with a second peak at around the 4,000 character count -- which may indicate that spam vendors are aware of the identification potential of email length and have begun targeting a longer length to avoid notice.
+
+![](../../results/figures/bodylength-distribution.png){.lightbox}
 
 Similarly, when we examine subject line length we observe the same tendency for spam emails to trend shorter. Subject line does not share the same distinct bi-modal shape for spam emails that the bodies do, but subject line length distribution between both spam and legitimate emails overlap in large part which may reduce it's efficacy for classification modeling. ![](../../results/figures/subjectlength-distribution.png){.lightbox}
 
@@ -69,59 +67,114 @@ When plotting body tokens we can see that 'http', which precedes most links with
 
 ![](../../results/figures/popular-body-tokens.png)
 
-Finally, we examined the most popular sender domain names for vendors of both spam and legitimate emails. In doing so we see some clear indications of which domains are favorable to spam vendors and which are not. Notably Gmail fails to make the top 25 domains for spam vendors despite being the far-and-away most common choice for legitimate emails. Similarly, Yahoo and Hotmail lead the pack for spam and are not among common domains for legitimate emails. This bodes well for the classification power of sender domain when we enter the modeling phase and begin to incorporate bag-of-words and text processing.
+Finally, we examined the most popular sender domain names for vendors of both spam and legitimate emails. In doing so we see some clear indications of which domains are favorable to spam vendors and which are not. Notably, Gmail fails to make the top 25 domains for spam vendors despite being the far-and-away most common choice for legitimate emails. Similarly, Yahoo and Hotmail lead the pack for spam and are not among common domains for legitimate emails. This bodes well for the classification power of sender domain when we enter the modeling phase and begin to incorporate bag-of-words and text processing.
 
 ![](../../results/figures/popular-domains.png)
 
 A complete set of exploratory visualization steps utilizing `ggplot2` can be located in the `.../code/eda-code/eda.qmd` file found within the project.
 
-## Statistical analysis
+## Statistical Analysis
 
-*Explain anything related to your statistical analyses.*
+### Preparing the Data
+
+For the purposes of this project our statistical analysis has been completed on a subset of the overall data to allow for reasonable processing times on consumer grade hardware. This extends into some of the choices that were made to exclude especially complex permutations of models whose parameter tuning would take days to complete on such hardware. For comments and notes about the specific choices made throughout the analysis process you can reference the `statistical-analysis.qmd` in its entirety. The following will be an overview of the data manipulation, feature engineering, dimensionality reduction, and model selection employed within:
+
+We began our analysis by establishing consistent, reusable tuning grids and custom functions for transforming the feature space of our training and testing data. In addition, we also established single-line, custom model training functions to improve legibility as we work through various permutations of both features and model types. We then proceeded to split our data into training and testing splits of 70% and 30% respectively with the latter withheld for model evaluation and to assess any overfitting issues.
+
+Once we had determined our training and testing splits we began to transform our unstructured text data into a structured feature space. This was begun by utilizing the `quanteda` package to tokenize each email body and subject, forcing all characters of each token to be lowercase, removing tokens for common English stopwords, and stemming each token to it's English, semantic root so that they could be aggregated on their shared meanings.
+
+With our unstructured text data now structured as simplified tokens we needed to identify which tokens within the overall text corpus are over represented and therefore provided little analytic value. In order to do so, we converted our data to a document-frequency matrix and calculated both the individual term frequencies of each token as well as their inverse document frequencies. The end goal of which was to created a Term Frequency - Inverse Document Frequency (TF-IDF) value for each token that penalizes and discounts those tokens that are over represented in our email corpus.
+
+Having standardized the values for each token by utilizing the TF-IDF, we were left with a structured matrix of tokens with incredibly high dimensionality (\>49K tokens) and incredibly high sparsity (\>99.9%). While these are common problems when analytically modeling text data, and many machine learning models are robust to data sets where the number of features far exceeds the number of observations, the computational burden for modeling with such high dimensionality is far greater than the typical predictive gains. Additionally, with such high dimensionality and sparsity we run the risk of added predictive noise depending on the models employed.
+
+To address these concerns our next step involved utilizing singular value decomposition to condense our features set to only those 300 singular values most capable of explaining the variation within our data. This process allowed us to both reduce the dimensionality and sparsity of the data while also simultaneously reducing the amount of noise presented by less significant tokens. However, it's worth noting that this comes at the cost of interpretability.
+
+Having completed this process for our training data we proceeded to project our test data into the same, final feature space so that the models can ultimately be used to predict with the new data.
+
+### Modeling
+
+With our final structured data prepared we proceeded with tuning 3 different types of classification models with 6 different combinations of features.
+
+The selected models were:
+
+-   Random Forest
+
+-   Radial Support Vector Machines
+
+-   and XGBoost
+
+These models were selected due to their capacity to handle high dimensional feature sets, their robustness to outlier values, and their ability to make accurate predictions about non-linearly related data.
+
+The selected combinations of features utilized with each model were:
+
+-   Email Body Tokens Only
+
+-   Email Body Tokens with Email Body Length
+
+-   Email Subject Tokens Only
+
+-   Email Subject Tokens with Email Body Length
+
+-   All Email Tokens Only
+
+-   and All Email Tokens with Email Body Length
+
+Additional code is also provided that includes permutations with sender email domains. However, due to the high cardinality of that feature and the limited processing power available on consumer grade hardware, the results were not considered in the scope of this project.
 
 {{< pagebreak >}}
 
 # Results
 
-@tbl-summarytable shows a summary of the data.
+Having completed each model we are now able to assess our model performance and ascertain which model is the most well suited for identification of spam emails. Utilizing the withheld test data we created predictions for the test data with each of our tuned models and generate confusion matrices to evaluate the overall performance of each.
 
-Note the loading of the data providing a **relative** path using the `../../` notation. (Two dots means a folder up). You never want to specify an **absolute** path like `C:\ahandel\myproject\results\` because if you share this with someone, it won't work for them since they don't have that path. You can also use the `here` R package to create paths. See examples of that below. I generally recommend the `here` package.
+We'll use this information to help inform which models generalized best when classifying new data and will assess which types of mistakes the models tend to err on the side of -- for our purposes allowing the occasional spam message through is likely better than overzealously blocking legitimate emails from reaching the user's inbox.
 
-## Basic statistical analysis
+In order to determine the model least likely to overzealously block legitimate emails we evaluated the performance of each model on the basis of Recall and F1 score. The former ensures we're classifying as many true legitimate emails correctly as possible, while the latter assesses the overall accuracy of our classification while factoring in the weights of any class imbalance.
 
-*To get some further insight into your data, if reasonable you could compute simple statistics (e.g. simple models with 1 predictor) to look for associations between your outcome(s) and each individual predictor variable. Though note that unless you pre-specified the outcome and main exposure, any "p\<0.05 means statistical significance" interpretation is not valid.*
+The following table contains the results of each model:
 
-@fig-result shows a scatterplot figure produced by one of the R scripts.
+```{r}
+cm.df <- readRDS(here("results", "tables", "confusion-matrix-compared.rds"))
+cm.df
+```
 
-## Full analysis
+Here we can see that the XGBoost model with only email body tokens seems to achieve the best balance of both F1 score and Recall. The optimal tuning parameters for this model are listed below:
 
-*Use one or several suitable statistical/machine learning methods to analyze your data and to produce meaningful figures, tables, etc. This might again be code that is best placed in one or several separate R scripts that need to be well documented. You want the code to produce figures and data ready for display as tables, and save those. Then you load them here.*
+```{r}
+best.params <- readRDS(here("results", "tables", "best-params.rds"))
+best.params
+```
 
-Example @tbl-resulttable2 shows a summary of a linear model fit.
+We can see that when examining the confusion matrix for this particular model permutation only 18 false negatives occurred and equally impressively only 26 false positives occurred. This is the exact side of classification error that we would hope to land on with more emails being allowed through than necessarily ought to be, but with few legitimate emails being caught in the model.
+
+```{r}
+cm.best <- readRDS(here("results", "tables", "best-confusion-matrix.rds"))
+cm.best
+```
+
+This high degree of accuracy can also be witnessed when plotting the ROC curve and deriving it's associated AUC value. With an exceptionally tight fit with the top-left most corner of the graph, the ROC curve for our best model all but maximizes the AUC value with a value of 99.4%.
+
+```{r}
+rocCurve <- readRDS(here("results", "tables", "roc.rds"))
+par(pty = "s")
+plot.roc(rocCurve, legacy.axes = T, percent = T, xlab = "False Positive Rate", ylab = "True Positive Rate", col = "aquamarine3", lwd = 5, print.auc = T)
+```
+
+Lastly we can begin to peer into the workings of the model by examining the variable importance plot. However, we begin to see the pitfalls of SVD on model interpretability. While we there are sharp declines in importance after the first two singular values and the second two singular values we're unable to ascertain what actual word choices in the body of the email these singular values are comprised of. However, considering the swift decline in importance it may be worth attempting to remodel using this same data without SVD on more powerful hardware so that better intrepretability might be possible.
+
+We do note that none of the highest performing models utilized either email subject tokens or email body length to achieve their scores. It's possible that the former only worked to introduce noise to the classification models and the latter was partially encompassed in the analysis of the tokens that comprise the body's length.
+
+![](../../results/figures/final-var-imp.png)
 
 {{< pagebreak >}}
 
-# Discussion
+# Conclusions
 
-## Summary and Interpretation
+Many of the limitations of this project were those that are inherent in text analytics and highly dimensional predictive modeling. With a very feature rich structured data frame the computational load is quite high. In total the modeling sessions utilizing the repeated cross-validation methodology we employed took a little over 3 hours to run through the permutations that contained the above mentioned features. There are additional features to explore in future iterations should the necessarily powerful hardware be available such as the inclusion of sender domain in addition to timestamp features like time of day, day of week, and month of year factors.
 
-*Summarize what you did, what you found and what it means.*
+Additionally, the use of singular value decomposition allowed for fairly complex modeling to take place on modest hardware, but it significantly hurt the interpretability of the model. While this may work as a black-box solution if rolled out into production, understanding what tokens are most important could be useful to better tune the model in the future by revising and customizing some elements as stopword lists.
 
-## Strengths and Limitations
-
-*Discuss what you perceive as strengths and limitations of your analysis.*
-
-## Conclusions
-
-*What are the main take-home messages?*
-
-*Include citations in your Rmd file using bibtex, the list of references will automatically be placed at the end*
-
-This paper [@leek2015] discusses types of analyses.
-
-These papers [@mckay2020; @mckay2020a] are good examples of papers published using a fully reproducible setup similar to the one shown in this template.
-
-Note that this cited reference will show up at the end of the document, the reference formatting is determined by the CSL file specified in the YAML header. Many more style files for almost any journal [are available](https://www.zotero.org/styles). You also specify the location of your bibtex reference file in the YAML. You can call your reference file anything you like.
+In spite of these limitations, once the models were allowed to run we were able to produce quite sophisticated classification results with few legitimate emails being labeled as spam by our best model within our test set.
 
 {{< pagebreak >}}
 
